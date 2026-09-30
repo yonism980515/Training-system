@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELEVATE ADMIN</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121418; color: #e6f1ff; display: flex; height: 100vh; overflow: hidden; }
+
+        /* SIDOFÄLT (LEFT SIDEBAR) */
+        .sidebar { width: 260px; background-color: #1a1d24; border-right: 1px solid #2d323e; display: flex; flex-direction: column; padding: 20px; justify-content: space-between; }
+        .logo-box { border: 1px solid #ff4d2e; color: #ff4d2e; font-weight: bold; font-size: 1.1rem; text-align: center; padding: 12px; border-radius: 4px; letter-spacing: 1px; margin-bottom: 20px; text-transform: uppercase; }
+        
+        .search-box { position: relative; margin-bottom: 20px; }
+        .search-box input { width: 100%; background: #222630; border: 1px solid #2d323e; padding: 10px 10px 10px 32px; border-radius: 6px; color: #8892b0; font-size: 0.85rem; outline: none; }
+        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 8px; font-size: 0.8rem; opacity: 0.6; }
+
+        .nav-menu { display: flex; flex-direction: column; gap: 8px; }
+        .nav-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 6px; color: #a8b2d1; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: 0.2s; text-decoration: none; }
+        .nav-item:hover, .nav-item.active { background-color: #252a36; color: #ffffff; }
+        .badge { background: #ff4d2e; color: #fff; font-size: 0.75rem; padding: 2px 7px; border-radius: 10px; font-weight: bold; display: none; }
+
+        .logout-btn { color: #ff4d2e; font-size: 0.9rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 10px 0; }
+
+        /* HUVUDINNEHÅLL */
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; background-color: #121418; }
+        .page-title { font-size: 1.4rem; font-weight: bold; color: #4da6ff; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+
+        .card { background: #1a1d24; border: 1px solid #2d323e; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .card h3 { font-size: 1rem; color: #e6f1ff; margin-bottom: 15px; font-weight: 600; }
+
+        /* STATS GRID */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #222630; border: 1px solid #2d323e; padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-val { font-size: 1.4rem; font-weight: bold; margin-bottom: 4px; }
+        .stat-label { font-size: 0.8rem; color: #8892b0; }
+
+        .feed-box { height: 280px; background: #222630; border: 1px solid #2d323e; border-radius: 6px; padding: 15px; overflow-y: auto; margin-bottom: 15px; font-size: 0.9rem; display: flex; flex-direction: column; gap: 10px; }
+        .chat-msg { background: #2d323e; padding: 10px 14px; border-radius: 6px; max-width: 80%; width: fit-content; }
+        .chat-msg.me { background: #00B074; color: #fff; align-self: flex-end; }
+
+        .chat-input-row { display: flex; gap: 10px; }
+        .chat-input-row input { flex: 1; background: #222630; border: 1px solid #2d323e; padding: 12px; border-radius: 6px; color: #fff; outline: none; }
+        .btn-send { background: #00B074; color: #fff; border: none; padding: 0 25px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+        .diet-list, .metric-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+        .diet-item { background: #222630; border-left: 4px solid #00B074; padding: 14px 18px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .metric-item { background: #222630; border-left: 4px solid #00B074; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- SIDOFÄLT (LEFT SIDEBAR) -->
+    <div class="sidebar">
+        <div>
+            <div class="logo-box">ELEVATE ADMIN</div>
+            
+            <div class="search-box">
+                <input type="text" placeholder="Sök klient...">
+            </div>
+
+            <div class="nav-menu">
+                <div id="nav-coaching" class="nav-item active" onclick="switchTab('coaching')">
+                    <span>🧁 1on1 Coaching</span>
+                    <span id="badge-chat" class="badge">0</span>
+                </div>
+                <div id="nav-diet" class="nav-item" onclick="switchTab('diet')">
+                    <span>🥗 Klients Diet</span>
+                    <span id="badge-diet" class="badge">0</span>
+                </div>
+                <div id="nav-workout" class="nav-item" onclick="switchTab('workout')">
+                    <span>📊 Klienters Träning & Status</span>
+                    <span id="badge-workout" class="badge">0</span>
+                </div>
+                <div id="nav-metrics" class="nav-item" onclick="switchTab('metrics')">
+                    <span>📈 Mätvärden</span>
+                    <span id="badge-metrics" class="badge">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="logout-btn" onclick="location.href='/logout'">
+            <span style="display:inline-block; width:10px; height:10px; background:#ff4d2e;"></span> Logga ut
+        </div>
+    </div>
+
+    <!-- HUVUDYTA (RIGHT CONTENT AREA) -->
+    <div class="main-content">
+        
+        <!-- FLIK 1: 1on1 COACHING -->
+        <div id="tab-coaching">
+            <div class="page-title">🧁 1on1 Coaching & Live-chatt</div>
+            <div class="card">
+                <h3>1on1 Live Coaching Chat</h3>
+                <div id="chat-feed" class="feed-box">
+                    <div class="chat-msg">System: Ansluten till live coaching...</div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input" placeholder="Skriv ett meddelande till klienten...">
+                    <button class="btn-send" onclick="sendMessage()">Sänd</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLIK 2: KLIENTS DIET -->
+        <div id="tab-diet" class="hidden">
+            <div class="page-title">🥗 Klients Diet & Kostöversikt</div>
+            
+            <!-- Översiktskort för Kalorier & Mål -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-val" style="color:#4da6ff;" id="admin-target-kcal">1 856</div>
+                    <div class="stat-label">Mål (kcal)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" style="color:#ff4d2e;" id="admin-eaten-kcal">0</div>
+                    <div class="stat-label">Ätit (kcal)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" style="color:#00B074;" id="admin-remaining-kcal">1 856</div>
+                    <div class="stat-label">Kvar (kcal)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-val" style="color:#00B074;" id="admin-protein-g">0g</div>
+                    <div class="stat-label">Protein</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🍎 Loggade Måltider under Dagen</h3>
+                <ul class="diet-list" id="diet-feed">
+                    <p style="color:#8892b0;" id="no-diet-text">Inga måltider loggade idag.</p>
+                </ul>
+            </div>
+        </div>
+
+        <!-- FLIK 3: KLIENTERS TRÄNING & STATUS -->
+        <div id="tab-workout" class="hidden">
+            <div class="page-title">📊 Klienters Träning & Status</div>
+            <div class="card">
+                <h3>🏋️ Live Träningsfeed</h3>
+                <div id="workout-feed" class="feed-box">
+                    <p style="color:#8892b0;">Väntar på att klienter ska starta eller logga sina träningspass...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLIK 4: MÄTVÄRDEN -->
+        <div id="tab-metrics" class="hidden">
+            <div class="page-title">📈 Inrapporterade Mätvärden</div>
+            <div class="card">
+                <h3>Klienters historik & mätvärden</h3>
+                <ul class="metric-list" id="metric-feed">
+                    <p style="color:#8892b0;">Inga mätvärden rapporterade ännu.</p>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const socket = io();
+        let currentTab = 'coaching';
+
+        let unread = {
+            chat: 0,
+            diet: 0,
+            workout: 0,
+            metrics: 0
+        };
+
+        let eatenKcalTotal = 0;
+        let targetKcal = 1856;
+
+        function renderBadge(id, count) {
+            const el = document.getElementById(id);
+            if (count > 0) {
+                el.innerText = count;
+                el.style.display = 'inline-block';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+
+        function updateBadges() {
+            renderBadge('badge-chat', unread.chat);
+            renderBadge('badge-diet', unread.diet);
+            renderBadge('badge-workout', unread.workout);
+            renderBadge('badge-metrics', unread.metrics);
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+
+            document.getElementById('tab-coaching').classList.add('hidden');
+            document.getElementById('tab-diet').classList.add('hidden');
+            document.getElementById('tab-workout').classList.add('hidden');
+            document.getElementById('tab-metrics').classList.add('hidden');
+
+            document.getElementById('nav-coaching').classList.remove('active');
+            document.getElementById('nav-diet').classList.remove('active');
+            document.getElementById('nav-workout').classList.remove('active');
+            document.getElementById('nav-metrics').classList.remove('active');
+
+            if (tab === 'coaching') {
+                document.getElementById('tab-coaching').classList.remove('hidden');
+                document.getElementById('nav-coaching').classList.add('active');
+                unread.chat = 0;
+            } else if (tab === 'diet') {
+                document.getElementById('tab-diet').classList.remove('hidden');
+                document.getElementById('nav-diet').classList.add('active');
+                unread.diet = 0;
+            } else if (tab === 'workout') {
+                document.getElementById('tab-workout').classList.remove('hidden');
+                document.getElementById('nav-workout').classList.add('active');
+                unread.workout = 0;
+            } else if (tab === 'metrics') {
+                document.getElementById('tab-metrics').classList.remove('hidden');
+                document.getElementById('nav-metrics').classList.add('active');
+                unread.metrics = 0;
+            }
+
+            updateBadges();
+        }
+
+        // Live Chatt
+        socket.on('receive_message', (data) => {
+            const feed = document.getElementById('chat-feed');
+            const div = document.createElement('div');
+            const isMe = data.sender === 'Coach';
+            div.className = `chat-msg ${isMe ? 'me' : ''}`;
+            div.innerHTML = `<strong>${data.sender}:</strong> ${data.message}`;
+            feed.appendChild(div);
+            feed.scrollTop = feed.scrollHeight;
+
+            if (currentTab !== 'coaching' && !isMe) {
+                unread.chat++;
+                updateBadges();
+            }
+        });
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text) {
+                socket.emit('send_message', {
+                    sender: 'Coach',
+                    message: text,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+                input.value = '';
+            }
+        }
+
+        // Träningsfeed
+        socket.on('admin_workout_feed', (data) => {
+            const feed = document.getElementById('workout-feed');
+            const p = document.createElement('p');
+            p.style.marginBottom = '6px';
+            p.innerHTML = `🟢 <strong style="color:#00B074;">${data.clientId}:</strong> ${data.exercise} (Set ${data.set}) - <small style="color:#8892b0;">${data.timestamp}</small>`;
+            feed.appendChild(p);
+            feed.scrollTop = feed.scrollHeight;
+
+            if (currentTab !== 'workout') {
+                unread.workout++;
+                updateBadges();
+            }
+        });
+
+        // Mätvärden
+        socket.on('admin_metric_feed', (data) => {
+            const feed = document.getElementById('metric-feed');
+            const li = document.createElement('li');
+            li.className = 'metric-item';
+            li.innerHTML = `
+                <div>
+                    <strong>${data.clientId}</strong>
+                    <p style="font-size:0.8rem; color:#8892b0;">Datum: ${data.date}</p>
+                </div>
+                <div>
+                    <span style="color:#00B074; font-weight:bold;">Vikt: ${data.weight} kg</span> | 
+                    <span style="color:#00B074; font-weight:bold;">Midja: ${data.waist || '-'} cm</span>
+                </div>
+            `;
+            feed.appendChild(li);
+
+            if (currentTab !== 'metrics') {
+                unread.metrics++;
+                updateBadges();
+            }
+        });
+
+        // Diet / Måltid från klient
+        socket.on('admin_diet_feed', (data) => {
+            const feed = document.getElementById('diet-feed');
+            const noDietText = document.getElementById('no-diet-text');
+            if (noDietText) noDietText.remove();
+
+            const li = document.createElement('li');
+            li.className = 'diet-item';
+            
+            const mealName = data.meal || 'Måltid';
+            const calories = parseInt(data.calories) || 0;
+            const clientName = data.clientId ? ` (${data.clientId})` : '';
+
+            li.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:1.2rem;">🍎</span>
+                    <div>
+                        <strong style="color:#ffffff; font-size:1rem;">${mealName}</strong><span style="font-size:0.8rem; color:#8892b0;">${clientName}</span>
+                    </div>
+                </div>
+                <span style="color:#00B074; font-weight:bold; font-size:1.1rem;">${calories} kcal</span>
+            `;
+            feed.appendChild(li);
+
+            // Uppdatera summering för Admin
+            eatenKcalTotal += calories;
+            document.getElementById('admin-eaten-kcal').innerText = eatenKcalTotal;
+            document.getElementById('admin-remaining-kcal').innerText = Math.max(0, targetKcal - eatenKcalTotal);
+
+            if (currentTab !== 'diet') {
+                unread.diet++;
+                updateBadges();
+            }
+        });
+
+        document.getElementById('chat-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        updateBadges();
+    </script>
+</body>
+</html>
